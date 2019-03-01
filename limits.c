@@ -178,10 +178,16 @@ void limits_go_home(uint8_t cycle_mask)
     axislock = 0;
     n_active_axis = 0;
     for (idx=0; idx<N_AXIS; idx++) {
-      // Set target location for active axes and setup computation for homing rate.
-      if (bit_istrue(cycle_mask,bit(idx))) {
+    if (bit_istrue(cycle_mask,bit(idx))) {
         n_active_axis++;
         sys.position[idx] = 0;
+        #ifndef COREXY
+          sys.position[idx] = 0;
+        #else
+          sys.position[A_MOTOR] = 0;
+          sys.position[B_MOTOR] = 0;
+        #endif
+		
         // Set target direction based on cycle mask and homing cycle approach state.
         // NOTE: This happens to compile smaller than any other implementation tried.
         if (bit_istrue(settings.homing_dir_mask,bit(idx))) {
@@ -213,13 +219,23 @@ void limits_go_home(uint8_t cycle_mask)
 	do {
 	  if (approach) {
 		// Check limit state. Lock out cycle axes when they change.
-		limit_state = limits_get_state();
-		for (idx=0; idx<N_AXIS; idx++) {
-		  if (axislock & step_pin[idx]) {
-			if (limit_state & (1 << idx)) { axislock &= ~(step_pin[idx]); }
-		  }
-		}
-		sys.homing_axis_lock = axislock;
+		 // Check limit state. Lock out cycle axes when they change.
+        limit_state = limits_get_state();
+        for (idx=0; idx<N_AXIS; idx++) {
+          if (axislock & step_pin[idx]) {
+            if (limit_state & (1 << idx)) {
+                      #ifndef COREXY
+                        axislock &= ~(step_pin[idx]);
+                      #else
+                        if (idx==2) // axe Z
+                {axislock &= ~(step_pin[idx]);} // Yann
+            else 
+                {axislock &= ~(step_pin[A_MOTOR]|step_pin[B_MOTOR]);}
+                      #endif
+                    }
+          }
+        }
+        sys.homing_axis_lock = axislock;
 	  }
 
 	  st_prep_buffer(); // Check and prep segment buffer. NOTE: Should take no longer than 200us.
